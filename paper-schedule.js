@@ -122,3 +122,212 @@ const firstSection = window.TRIP_DATA.checklistSections && window.TRIP_DATA.chec
 if (firstSection && !firstSection.items.some(x => x.id === "group-leader")) {
   firstSection.items.push({ id: "group-leader", text: "領隊電話已存入手機", note: "吳昭蓉 0937-253-750" });
 }
+
+// ===== Excel HOTEL / OTHER BOOKING / OTHERS 補充資料 =====
+(() => {
+  const data = window.TRIP_DATA;
+  const days = data.days;
+
+  function addUniqueEvent(date, event) {
+    const day = days[date];
+    if (!day) return;
+    day.events = day.events || [];
+    if (!day.events.some(e => e.title === event.title)) day.events.push(event);
+  }
+
+  function addHotelBooking(date, info) {
+    const detail = [
+      info.order ? `訂房編號：${info.order}` : null,
+      info.booking ? `訂位來源：${info.booking}` : null,
+      info.amount ? `金額：${info.amount}` : null,
+      info.cityTax ? `CITY TAX：${info.cityTax}` : null,
+      `PAID：${info.paid}`,
+      `早餐：${info.breakfast}`,
+      info.dinner ? `晚餐：${info.dinner}` : null
+    ].filter(Boolean).join('\n');
+
+    const tags = ["住宿預訂"];
+    if (info.paid === "V") tags.push("已付款");
+    if (info.paid === "X") tags.push("需確認付款");
+    if (info.breakfast === "V") tags.push("含早餐");
+    if (info.breakfast === "X") tags.push("早餐不含");
+    if (info.dinner === "V") tags.push("含晚餐");
+
+    addUniqueEvent(date, {
+      title: `住宿預訂資訊｜${info.hotel}`,
+      detail,
+      map: info.hotel,
+      important: info.paid === "X",
+      tags
+    });
+  }
+
+  // HOTEL：9/5 羊角村
+  addHotelBooking("2026-09-05", {
+    hotel: "De Dames van de jonge Hotel",
+    booking: "7/5 Gmail",
+    amount: "234.52（原表未標幣別）",
+    cityTax: "83.24（HOTEL 頁註記）",
+    paid: "V",
+    breakfast: "V",
+    dinner: "V"
+  });
+
+  // HOTEL：9/6–9/7 Amsterdam
+  ["2026-09-06", "2026-09-07"].forEach(date => addHotelBooking(date, {
+    hotel: "Anantara Grand Hotel Krasnapolsky",
+    order: "200843684",
+    booking: "7/3 Gmail",
+    amount: "917.88 EU",
+    paid: "X",
+    breakfast: "V"
+  }));
+
+  // HOTEL：9/8 Prague Airport
+  addHotelBooking("2026-09-08", {
+    hotel: "Courtyard by Marriott Prague Airport",
+    order: "88552218",
+    booking: "7/3 Gmail",
+    amount: "5392 CZK",
+    paid: "X",
+    breakfast: "X"
+  });
+
+  // HOTEL：9/18–9/19 Vienna
+  ["2026-09-18", "2026-09-19"].forEach(date => addHotelBooking(date, {
+    hotel: "Ibis Wien Hauptbahnhof",
+    order: "QMJPBPZL",
+    booking: "7/5 Gmail",
+    amount: "307.8 EU",
+    paid: "V",
+    breakfast: "V"
+  }));
+
+  // HOTEL：9/20–9/22 Budapest
+  ["2026-09-20", "2026-09-21", "2026-09-22"].forEach(date => addHotelBooking(date, {
+    hotel: "InterContinental Budapest",
+    order: "29237094",
+    booking: "7/4 Gmail",
+    amount: "1280.18 EU",
+    paid: "X",
+    breakfast: "V"
+  }));
+
+  // HOTEL：9/23 Vienna
+  addHotelBooking("2026-09-23", {
+    hotel: "Ibis Wien Hauptbahnhof",
+    order: "QNFPCKVK",
+    booking: "7/22 Gmail",
+    amount: "160.16 EU",
+    paid: "V",
+    breakfast: "V"
+  });
+
+  // OTHER BOOKING：9/8 KL1357
+  const sep8 = days["2026-09-08"];
+  if (sep8) {
+    const flight = (sep8.events || []).find(e => /KL1357/.test(e.title || ""));
+    if (flight) {
+      const extra = "訂位來源：7/3 Gmail｜Booked：V｜Schiphol Airport → Prague-Ruzyne Airport｜座位 11C、11D";
+      if (!String(flight.detail || "").includes("7/3 Gmail")) flight.detail = `${flight.detail || ""}\n${extra}`.trim();
+      flight.tags = Array.from(new Set([...(flight.tags || []), "已訂"]));
+    }
+  }
+
+  // OTHER BOOKING：9/16 金色大廳音樂會
+  const sep16 = days["2026-09-16"];
+  if (sep16) {
+    const concert = (sep16.events || []).find(e => /金色大廳/.test(e.title || ""));
+    if (concert) {
+      concert.detail = "OTHER BOOKING 註記：先上網買門票。Excel 尚未標示 Booked=V，出發前需確認是否已購票。";
+      concert.tags = Array.from(new Set([...(concert.tags || []), "先上網買門票"]));
+    }
+  }
+
+  // OTHER BOOKING 與 DAY TRIP 日期互相矛盾，兩天都顯示，避免漏看。
+  addUniqueEvent("2026-09-18", {
+    title: "⚠️ 日期衝突｜OTHER BOOKING 把 Wachau ticket 寫在 9/18",
+    detail: "DAY TRIP 的 Wachau / Melk / Dürnstein 一日遊安排在 9/19。票券實際使用日期出發前要再確認。",
+    danger: true,
+    important: true,
+    tags: ["日期需確認", "Wachau ticket"]
+  });
+
+  addUniqueEvent("2026-09-19", {
+    start: "10:00",
+    title: "⚠️ 日期衝突｜OTHER BOOKING 把 Café im KHM 寫在 9/19 10:00",
+    detail: "OTHER BOOKING：7/31 Gmail 已預約 10:00；需要先買藝術史博物館門票，才能入內喝咖啡，建議先喝再參觀。DAY TRIP 則把 KHM Café 安排在 9/18。",
+    map: "Café im Kunsthistorischen Museum Vienna",
+    danger: true,
+    important: true,
+    tags: ["日期需確認", "需博物館門票"]
+  });
+
+  // OTHER BOOKING：RJX19929 / RJX64，補 Booked 與原表月台範圍。
+  const sep20 = days["2026-09-20"];
+  if (sep20) {
+    const train = (sep20.events || []).find(e => /RJX 19929|RJX19929/.test(e.title || ""));
+    if (train) {
+      const extra = "Wien Hbf 原表標示 Bahnsteige 3–12｜OBB APP｜Booked：V｜建議另備紙本票。";
+      if (!String(train.detail || "").includes("Bahnsteige 3–12")) train.detail = `${train.detail || ""}\n${extra}`.trim();
+      train.tags = Array.from(new Set([...(train.tags || []), "已訂"]));
+    }
+  }
+
+  const sep23 = days["2026-09-23"];
+  if (sep23) {
+    const train = (sep23.events || []).find(e => /RJX 64|RJX64/.test(e.title || ""));
+    if (train) {
+      const extra = "Wien Hbf 原表標示 Bahnsteige 3–12｜OBB APP｜Booked：V｜建議另備紙本票。";
+      if (!String(train.detail || "").includes("Bahnsteige 3–12")) train.detail = `${train.detail || ""}\n${extra}`.trim();
+      train.tags = Array.from(new Set([...(train.tags || []), "已訂"]));
+    }
+  }
+
+  // OTHERS：補漏項到 Checklist。
+  const first = data.checklistSections.find(s => s.title === "一定先確認");
+  const docs = data.checklistSections.find(s => s.title === "證件・票券");
+  const carry = data.checklistSections.find(s => s.title === "隨身與藥品");
+
+  function addChecklist(section, item) {
+    if (section && !section.items.some(x => x.id === item.id)) section.items.push(item);
+  }
+
+  addChecklist(docs, {
+    id: "insurance-cathay",
+    text: "旅遊保險資料已備妥",
+    note: "原表：INSURANCE／國泰人壽／甘鳳生。"
+  });
+  addChecklist(docs, {
+    id: "airport-lounge-gold-card",
+    text: "貴賓室／金卡資料",
+    note: "原表：貴賓室 OK；申請金卡 8/25。"
+  });
+
+  addChecklist(first, {
+    id: "hotel-pay-anantara",
+    text: "確認 Anantara 住宿付款方式",
+    note: "HOTEL 原表 PAID = X；Booking No. 200843684。",
+    alert: true
+  });
+  addChecklist(first, {
+    id: "hotel-pay-prague",
+    text: "確認 Prague Courtyard 住宿付款方式",
+    note: "HOTEL 原表 PAID = X、早餐 = X；Booking No. 88552218。",
+    alert: true
+  });
+  addChecklist(first, {
+    id: "hotel-pay-budapest",
+    text: "確認 InterContinental Budapest 住宿付款方式",
+    note: "HOTEL 原表 PAID = X；Booking No. 29237094。",
+    alert: true
+  });
+
+  if (carry) {
+    const sharp = carry.items.find(x => x.id === "sharp");
+    if (sharp) {
+      sharp.text = "指甲剪／小剪刀／水果刀／叉子（刀剪類放托運行李）";
+      sharp.note = "原表另列指甲剪、叉子；刀剪不要放隨身行李過安檢。";
+    }
+  }
+})();
