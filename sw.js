@@ -1,17 +1,17 @@
-const CACHE_NAME = 'tina-chen-trip-v2';
+const CACHE_NAME = 'tina-chen-trip-v3';
 const APP_FILES = [
   './',
   './index.html',
-  './trip-base.js',
-  './trip-days-1.js',
-  './trip-days-2.js',
-  './trip-days-3.js',
-  './trip-days-4.js',
-  './trip-days-5.js',
-  './trip-days-6.js',
-  './trip-days-7.js',
-  './paper-schedule.js',
-  './app-v2.js'
+  './trip-base.js?v=20260825-3',
+  './trip-days-1.js?v=20260825-3',
+  './trip-days-2.js?v=20260825-3',
+  './trip-days-3.js?v=20260825-3',
+  './trip-days-4.js?v=20260825-3',
+  './trip-days-5.js?v=20260825-3',
+  './trip-days-6.js?v=20260825-3',
+  './trip-days-7.js?v=20260825-3',
+  './paper-schedule.js?v=20260825-3',
+  './app-v2.js?v=20260825-3'
 ];
 
 self.addEventListener('install', event => {
@@ -21,23 +21,35 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))))
+    caches.keys().then(keys => Promise.all(
+      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+    ))
   );
   self.clients.claim();
 });
 
+// Online: always ask the network first so GitHub Pages updates show immediately.
+// Offline: fall back to the last successfully cached copy.
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
-  event.respondWith(
-    caches.match(event.request).then(cached => {
+  const url = new URL(event.request.url);
+  if (url.origin !== self.location.origin) return;
+
+  event.respondWith((async () => {
+    try {
+      const response = await fetch(event.request, { cache: 'no-store' });
+      if (response && response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
+      }
+      return response;
+    } catch (error) {
+      const cached = await caches.match(event.request);
       if (cached) return cached;
-      return fetch(event.request).then(response => {
-        if (response && response.ok && new URL(event.request.url).origin === self.location.origin) {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy));
-        }
-        return response;
-      }).catch(() => caches.match('./index.html'));
-    })
-  );
+      if (event.request.mode === 'navigate') {
+        return caches.match('./index.html');
+      }
+      throw error;
+    }
+  })());
 });
